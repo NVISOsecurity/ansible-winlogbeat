@@ -1,0 +1,294 @@
+###################### Winlogbeat Configuration Example ##########################
+#
+#  Malware Archaeology - WinLogBeat.yml file
+#     Created by Michael Gough - April 2018
+#
+#  This is a modified default Winlogbeat.yml file to collect many logs
+#  not collected by default.  Use this to expand collection and to
+#  exclude items that are normal noise to cut back on what you collect
+#  to your log management solution
+#
+#  WARNING:  Tabs are bad for .yml files and will NOT load.  Use an editor you can see tabs vs spaces !!!!!!!
+#
+#  ###############################################################################
+#
+#  Use for Humio, ELK and any other supported log management solutions
+#
+# This file is an example configuration file highlighting only the most common
+# options. The winlogbeat.reference.yml file from the same directory contains all the
+# supported options with more comments. You can use it as a reference.
+#
+# You can find the full configuration reference here:
+# https://www.elastic.co/guide/en/beats/winlogbeat/index.html
+
+#======================= Winlogbeat specific options ==========================
+
+#
+#  Malware Archaeology added several logs to be collected that are not in
+#  in the default winlogbeat.yml file.  You must also enable some logs in
+#  Windows to collect the events.  Several noisy Event IDs are excluded
+#  4689 - Process Terminate
+#  5158 - Windows Firewall has permitted a bind to a local port
+#  5157 - Windows Firewall has blocked a connection
+#  501 - Windows PowerShell v2 script terminate
+#  4105 - VERY noisy PowerShell v5 ScriptBlockInvocationLogging
+#  4106 - VERY noisy PowerShell v5 ScriptBlockInvocationLogging
+#
+#  Add any other event logs that you want to collect, refer to the Cheat Sheets
+#  for more information:
+#    www.MalwareArchaeology.com/cheat-sheets
+#
+# -----------------------------------------------------------------------------
+# event_logs specifies a list of event logs to monitor as well as any
+# accompanying options. The YAML data type of event_logs is a list of
+# dictionaries.
+#
+# The supported keys are name (required), tags, fields, fields_under_root,
+# forwarded, ignore_older, level, event_id, provider, and include_xml. Please
+# visit the documentation for the complete details of each option.
+# https://go.es.io/WinlogbeatConfig
+
+winlogbeat.event_logs:
+  - name: Security
+    event_id: -4689, -5158, -5157 
+  - name: Application
+    ignore_older: 720h
+  - name: System
+  - name: "Windows PowerShell"
+    event_id: -501 
+  - name: "Microsoft-Windows-TaskScheduler/Operational"
+  - name: "Microsoft-Windows-PowerShell/Operational"
+    event_id: -4105, -4106
+  - name: Microsoft-Windows-Windows Defender/Operational
+  - name: Microsoft-Windows-Windows Firewall With Advanced Security/Firewall
+    include_xml: true
+# - name: "Microsoft-Windows-Sysmon/Operational" (optional service)
+#
+#  ##########################################################################################################################
+#
+#  These are the exclude events by type.  
+
+#  WARNING:  WinLogBeat does NOT allow for wild card, so any items with a version can allow gaps if you broadly exclude
+#
+#  e.g.  C:\Users\<username>\AppData\Local\Google\Chrome\User Data\SwReporter\28.151.200\software_reporter_tool.exe
+#  would be excluded by a broad statement to avoid future version entries:
+#    C:\Users\<username>\AppData\Local\Google\Chrome\User Data\SwReporter
+#  This means anything dropped or exists in this path will be excluded.. including any malware.
+#  Be as specific as possible and avoid excluding by binary name alone as it does not have the file
+#  location and malware often uses real application filenames.  contains is more broad than equals, use sparingly
+#
+#  Exclude Process Created items - 4688
+#   
+processors:
+- drop_event.when.or:
+  - equals.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\slack\app-3.1.0\slack.exe'
+  - equals.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\slack\Update.exe'
+  - equals.event_data.NewProcessName: 'C:\Users\<username>\AppData\Roaming\Foxit Software\Addon\Foxit Reader\FoxitReaderUpdater.exe'
+  - equals.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\Temp\SkypeSetup.exe'
+  - contains.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\GoToMeeting\'
+  - contains.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\Temp\LogMeInUpdates\GoToMeeting'
+  - contains.event_data.NewProcessName: 'AppData\Local\Google\Chrome\User Data\SwReporter\'
+  - contains.event_data.NewProcessName: '\g2viewer.exe'
+  - contains.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\GoToMyPC\gotomypc_'
+  - contains.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\Temp\LogMeInUpdates\GoToMeeting'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\NVIDIA Corporation\Update Core\NvTmMon.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\NVIDIA Corporation\Update Core\NvSHIM.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\NVIDIA Corporation\NVIDIA GeForce Experience\NVIDIA Notification.exe'
+  - equals.event_data.NewProcessName: 'C:\Windows\System32\conhost.exe'
+  - contains.event_data.NewProcessName: 'C:\Windows\Microsoft.NET\Framework64\v2.0.50727'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Adobe\Acrobat Reader DC\Reader\AcroRd32.exe'
+#
+#  Browser events are NOISY.. you should care more what happens after the browser than what is in the browser
+#  Web Proxy logs can give you data on users surfing.  This saves a LOT of events from being collected
+#
+#  Exclude Process Created Browser items - 4688
+#
+- drop_event.when.or:     
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Google\Update\GoogleUpdate.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Mozilla Firefox\firefox.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Mozilla Firefox\updater.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Mozilla Firefox\pingsender.exe'
+  - equals.event_data.NewProcessName: 'C:\Program Files (x86)\Mozilla Maintenance Service\update\updater.exe'
+  - contains.event_data.NewProcessName: 'C:\Users\<username>\AppData\Local\Google\Chrome\User Data\SwReporter\'
+#
+# Exclude Command Line items - 4688
+#
+- drop_event.when.or:  
+  - equals.event_data.CommandLine: 'C:\Windows\system32\DllHost.exe /Processid:{AB8902B4-09CA-4BB6-B78D-A8F59079A8D5}'
+  - equals.event_data.CommandLine: 'C:\WINDOWS\system32\SearchFilterHost.exe" 0 540 544 552 65536 548'
+  - contains.event_data.CommandLine: 'C:\WINDOWS\system32\SearchFilterHost.exe'
+  - equals.event_data.CommandLine: 'cmd ver'
+#
+# Exclude Win Firewall by Destination IP - 5156
+#
+# exclude DNS, IPv6 and broadcast events
+#
+- drop_event.when.or:  
+  - equals.event_data.DestAddress: '1.1.1.1'
+  - equals.event_data.DestAddress: '8.8.8.8'
+  - equals.event_data.DestAddress: '8.8.4.4'
+  - equals.event_data.DestAddress: '192.168.1.255'
+  - equals.event_data.DestAddress: '127.0.0.1'
+  - equals.event_data.DestAddress: '224.0.0.1'
+  - contains.event_data.DestAddress: '224.0.0.'
+  - equals.event_data.DestAddress: '224.0.0.251'
+  - equals.event_data.DestAddress: '239.255.255.250'
+  - equals.event_data.DestAddress: '255.255.255.255'
+  - equals.event_data.DestAddress: '::1'
+  - equals.event_data.DestAddress: '88.99.208.2'
+#
+# Exclude Win Firewall by Source IP - 5156
+#
+# exclude DNS, IPv6 and broadcast events
+#  
+- drop_event.when.or:    
+  - equals.event_data.SourceAddress: '239.255.255.250' 
+  - equals.event_data.SourceAddress: '239.255.255.255' 
+  - equals.event_data.SourceAddress: '255.255.255.255' 
+  - equals.event_data.SourceAddress: '192.168.1.255'
+  - equals.event_data.SourceAddress: '224.0.0.251'
+  - equals.event_data.SourceAddress: '224.0.0.252'
+  - contains.event_data.SourceAddress: '224.0.0.'
+  - contains.event_data.SourceAddress: 'fe80::'
+  - equals.event_data.SourceAddress: '224.0.0.1'
+  - equals.event_data.SourceAddress: '::1'
+  - equals.event_data.SourceAddress: '1.1.1.1'
+  - equals.event_data.SourceAddress: '8.8.8.8'
+  - equals.event_data.SourceAddress: '8.8.4.4'
+#
+# Exclude Win Firewall by Application source and destination - 5156
+#
+# exclude noisy typical chatter that won't tell you much
+#
+- drop_event.when.or: 
+  - contains.event_data.Application: '\program files (x86)\dropbox\client\dropbox.exe'
+  - contains.event_data.Application: '\program files (x86)\google\chrome\application\chrome.exe'
+  - contains.event_data.Application: '\program files (x86)\mozilla firefox\firefox.exe'
+  - contains.event_data.Application: '\users\<username>\appdata\local\slack\app-'
+  - contains.event_data.Application: '\windows\system32\spoolsv.exe'
+#
+#  Exclude Win Firewall by Application AND Source IP - 5156
+#
+# exclude by known trusted combinations of items
+#
+- drop_event.when.and:  
+  - contains.event_data.Application: '\program files\<some_program>\<App_Path>\binary.exe'
+  - equals.event_data.SourceAddress: '192.168.5.123'
+
+  
+#==================== Elasticsearch template setting ==========================
+
+settemplate.settings:
+  index.number_of_shards: 3
+  #index.codec: best_compression
+  #_source.enabled: false
+
+#================================ General =====================================
+
+# The name of the shipper that publishes the network data. It can be used to group
+# all the transactions sent by a single shipper in the web interface.
+#name:
+
+# The tags of the shipper are included in their own field with each
+# transaction published.
+#tags: ["service-X", "web-tier"]
+
+# Optional fields that you can specify to add additional information to the
+# output.
+#fields:
+#  env: staging
+
+
+#============================== Dashboards =====================================
+# These settings control loading the sample dashboards to the Kibana index. Loading
+# the dashboards is disabled by default and can be enabled either by setting the
+# options here, or by using the `-setup` CLI flag or the `setup` command.
+#setup.dashboards.enabled: false
+
+# The URL from where to download the dashboards archive. By default this URL
+# has a value which is computed based on the Beat name and version. For released
+# versions, this URL points to the dashboard archive on the artifacts.elastic.co
+# website.
+#setup.dashboards.url:
+
+#============================== Kibana =====================================
+
+# Starting with Beats version 6.0.0, the dashboards are loaded via the Kibana API.
+# This requires a Kibana endpoint configuration.
+setup.kibana:
+
+  # Kibana Host
+  # Scheme and port can be left out and will be set to the default (http and 5601)
+  # In case you specify and additional path, the scheme is required: http://localhost:5601/path
+  # IPv6 addresses should always be defined as: https://[2001:db8::1]:5601
+  #host: "localhost:5601"
+
+#============================= Elastic Cloud ==================================
+
+# These settings simplify using winlogbeat with the Elastic Cloud (https://cloud.elastic.co/).
+
+# The cloud.id setting overwrites the `output.elasticsearch.hosts` and
+# `setup.kibana.host` options.
+# You can find the `cloud.id` in the Elastic Cloud web UI.
+#cloud.id:
+
+# The cloud.auth setting overwrites the `output.elasticsearch.username` and
+# `output.elasticsearch.password` settings. The format is `<user>:<pass>`.
+#cloud.auth:
+
+#================================ Outputs =====================================
+
+# Configure what output to use when sending the data collected by the beat.
+
+#-------------------------- Elasticsearch output ------------------------------
+
+# Humio or ELK Configuration
+
+#output:
+#  elasticsearch:
+#    hosts: ["https://<servername>:443/api/v1/dataspaces/sandbox/ingest/elasticsearch"]
+#    username: "<Your Username or Key>"
+#    compression_level: 5
+#    bulk_max_size: 50
+      
+#----------------------------- Logstash output --------------------------------
+output.logstash:
+  # The Logstash hosts
+  hosts: ["{{ logstash_ip }}:5044"]
+
+  # Optional SSL. By default is off.
+  # List of root certificates for HTTPS server verifications
+  #ssl.certificate_authorities: ["/etc/pki/root/ca.pem"]
+
+  # Certificate for SSL client authentication
+  #ssl.certificate: "/etc/pki/client/cert.pem"
+
+  # Client Certificate Key
+  #ssl.key: "/etc/pki/client/cert.key"
+
+#================================ Logging =====================================
+
+# Sets log level. The default log level is info.
+# Available log levels are: error, warning, info, debug
+#logging.level: debug
+
+# At debug level, you can selectively enable logging only for some components.
+# To enable all selectors use ["*"]. Examples of other selectors are "beat",
+# "publish", "service".
+#logging.selectors: ["*"]
+
+#============================== Xpack Monitoring ===============================
+# winlogbeat can export internal metrics to a central Elasticsearch monitoring
+# cluster.  This requires xpack monitoring to be enabled in Elasticsearch.  The
+# reporting is disabled by default.
+
+# Set to true to enable the monitoring reporter.
+#xpack.monitoring.enabled: false
+
+# Uncomment to send the metrics to Elasticsearch. Most settings from the
+# Elasticsearch output are accepted here as well. Any setting that is not set is
+# automatically inherited from the Elasticsearch output configuration, so if you
+# have the Elasticsearch output configured, you can simply uncomment the
+# following line.
+#xpack.monitoring.elasticsearch:
