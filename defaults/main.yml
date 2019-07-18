@@ -1,4 +1,5 @@
-logstash_ip: 192.168.0.8
+logstash_ip: localhost
+logstash_winlogbeat_port: 5044
 winlogbeat_download_url_base: 'https://artifacts.elastic.co/downloads/beats/winlogbeat'
 file_ext: '.zip'
 winlogbeat_download_file: 'winlogbeat-6.8.1-windows-x86_64'
