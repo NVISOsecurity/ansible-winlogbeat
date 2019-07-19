@@ -1,0 +1,8 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: wstinkens
+  description: Winlogbeat install
+  company: "NVISO"
+  license: "license (BSD, MIT)"
